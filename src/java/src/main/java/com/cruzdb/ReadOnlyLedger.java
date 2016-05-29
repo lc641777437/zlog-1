@@ -14,8 +14,10 @@ public class ReadOnlyLedger extends Ledger{
 	
 	//trying to add to a read only log
 	@Override
-	public long addEntry(final byte[] data) throws LogException{
+	public long addEntry(final byte[] data) throws LogException,BkException{
 		//throw exception
+		if(bk.isClosed())
+			throw new BkException("Bookkeeper Client is closed\n");
 		throw new LogException("Can not right to a read only log.");
 	}
 }

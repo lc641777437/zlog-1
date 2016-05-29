@@ -5,6 +5,8 @@ public class Bookkeeper{
 	private String poolname;
 	private String seqr_server;
 	private int seqr_port;
+	private boolean closed = false;
+
 	
 	public Bookkeeper(String poolname,String seqr_server, int seqr_port){
 		this.poolname = poolname;
@@ -12,39 +14,29 @@ public class Bookkeeper{
 		this.seqr_port = seqr_port;
 	}
 	
-	public Ledger openLedger(String name) throws NullPointerException{
-		try{
-			Ledger l = new Ledger(this,name);
-			l.open();
-			return l;
-		}catch(LogException e){
-			System.out.format("Ledger with name %s does not exist\n",name);
-			return null;
-		}
+	public Ledger openLedger(String name) throws LogException,BkException{
+		if(this.isClosed())
+			throw new BkException("Bookkeeper client is closed\n");
+		Ledger l = new Ledger(this,name);
+		l.open();
+		return l;
 	}
 
 
-
-	public Ledger openReadOnlyLedger(String name) throws NullPointerException{
-		try{
-			Ledger l = new ReadOnlyLedger(this,name);
-			l.open();
-			return l;
-		}catch(LogException e){
-			System.out.format("Ledger with name %s does not exist\n",name);
-			return null;
-		}
+	public Ledger openReadOnlyLedger(String name) throws LogException,BkException{
+		if(this.isClosed())
+			throw new BkException("Bookkeeper client is closed\n");
+		Ledger l = new ReadOnlyLedger(this,name);
+		l.open();
+		return l;
 	}
 
-	public Ledger createLedger(String name) throws NullPointerException{
-		try{
-			Ledger l = new Ledger(this,name);
-			l.create();
-			return l;
-		}catch(LogException e){
-			System.out.format("Ledger with name %s already exists\n\n",name);
-			return null;
-		}
+	public Ledger createLedger(String name) throws LogException,BkException{
+		if(this.isClosed())
+			throw new BkException("Bookkeeper client is closed\n");
+		Ledger l = new Ledger(this,name);
+		l.create();
+		return l;
 	}
 
 	public String getPoolName(){
@@ -59,6 +51,17 @@ public class Bookkeeper{
 		return this.seqr_port;
 	}
 
+	public void close(){
+		this.closed = true;
+	}
+
+	public void open(){
+		this.closed = false;
+	}
+
+	public boolean isClosed(){
+		return this.closed;
+	}
 
 	/*
 	public void deleteLedger(){
