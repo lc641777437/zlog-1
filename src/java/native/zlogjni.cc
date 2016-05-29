@@ -77,6 +77,141 @@ out_noexcept:
   delete log;
 }
 
+
+
+void Java_com_cruzdb_Log_openExists(JNIEnv *env, jobject jobj, jstring jpool,
+    jstring jseqr_server, jint jseqr_port, jstring jlog_name)
+{
+  std::stringstream port;
+  const char *seqr_server;
+  const char *log_name;
+  const char *pool;
+  LogWrapper *log = new LogWrapper;
+
+  /*
+   * Connect to RADOS
+   */
+  int ret = log->rados.init(NULL);
+  if (ret)
+    goto out;
+
+  ret = log->rados.conf_read_file(NULL);
+  if (ret)
+    goto out;
+
+  ret = log->rados.conf_parse_env(NULL);
+  if (ret)
+    goto out;
+
+  ret = log->rados.connect();
+  if (ret)
+    goto out;
+
+  pool = env->GetStringUTFChars(jpool, 0);
+  ret = log->rados.ioctx_create(pool, log->ioctx);
+  env->ReleaseStringUTFChars(jpool, pool);
+  if (ret)
+    goto out;
+
+  /*
+   * Connect to sequencer
+   */
+  port << jseqr_port;
+  seqr_server = env->GetStringUTFChars(jseqr_server, 0);
+  log->seqr_client = new zlog::SeqrClient(seqr_server, port.str().c_str());
+  env->ReleaseStringUTFChars(jseqr_server, seqr_server);
+  try {
+    log->seqr_client->Connect();
+  } catch (...) {
+    ZlogExceptionJni::ThrowNew(env,
+        boost::current_exception_diagnostic_information());
+    goto out_noexcept;
+  }
+
+  log_name = env->GetStringUTFChars(jlog_name, 0);
+  ret = zlog::Log::Open(log->ioctx, log_name, log->seqr_client, &log->log);
+  env->ReleaseStringUTFChars(jlog_name, log_name);
+  if (ret)
+    goto out;
+
+  ZlogJni::setHandle(env, jobj, log);
+  return;
+
+out:
+  ZlogExceptionJni::ThrowNew(env, ret);
+
+out_noexcept:
+  delete log;
+}
+
+
+
+void Java_com_cruzdb_Log_createNative(JNIEnv *env, jobject jobj, jstring jpool,
+    jstring jseqr_server, jint jseqr_port, jstring jlog_name)
+{
+  std::stringstream port;
+  const char *seqr_server;
+  const char *log_name;
+  const char *pool;
+  LogWrapper *log = new LogWrapper;
+
+  /*
+   * Connect to RADOS
+   */
+  int ret = log->rados.init(NULL);
+  if (ret)
+    goto out;
+
+  ret = log->rados.conf_read_file(NULL);
+  if (ret)
+    goto out;
+
+  ret = log->rados.conf_parse_env(NULL);
+  if (ret)
+    goto out;
+
+  ret = log->rados.connect();
+  if (ret)
+    goto out;
+
+  pool = env->GetStringUTFChars(jpool, 0);
+  ret = log->rados.ioctx_create(pool, log->ioctx);
+  env->ReleaseStringUTFChars(jpool, pool);
+  if (ret)
+    goto out;
+
+  /*
+   * Connect to sequencer
+   */
+  port << jseqr_port;
+  seqr_server = env->GetStringUTFChars(jseqr_server, 0);
+  log->seqr_client = new zlog::SeqrClient(seqr_server, port.str().c_str());
+  env->ReleaseStringUTFChars(jseqr_server, seqr_server);
+  try {
+    log->seqr_client->Connect();
+  } catch (...) {
+    ZlogExceptionJni::ThrowNew(env,
+        boost::current_exception_diagnostic_information());
+    goto out_noexcept;
+  }
+
+  log_name = env->GetStringUTFChars(jlog_name, 0);
+  ret = zlog::Log::Create(log->ioctx, log_name, log->seqr_client, &log->log);
+  env->ReleaseStringUTFChars(jlog_name, log_name);
+  if (ret)
+    goto out;
+
+  ZlogJni::setHandle(env, jobj, log);
+  return;
+
+out:
+  ZlogExceptionJni::ThrowNew(env, ret);
+
+out_noexcept:
+  delete log;
+}
+
+
 jlong Java_com_cruzdb_Log_append(JNIEnv *env, jobject jlog,
     jlong jlog_handle, jbyteArray jdata, jint jdata_len)
 {

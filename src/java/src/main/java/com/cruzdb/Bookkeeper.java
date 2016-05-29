@@ -12,26 +12,58 @@ public class Bookkeeper{
 		this.seqr_port = seqr_port;
 	}
 	
-	public Ledger createLedger(String name) throws LogException{
-		return new Ledger(this.poolname,this.seqr_server,this.seqr_port,name);
+	public Ledger openLedger(String name) throws NullPointerException{
+		try{
+			Ledger l = new Ledger(this,name);
+			l.open();
+			return l;
+		}catch(LogException e){
+			System.out.format("Ledger with name %s does not exist\n",name);
+			return null;
+		}
 	}
 
-	/*public Ledger openLedger(String name){
-		Ledger ledger = new Ledger(this.poolname,this.seqr_server,this.seqr_port,name);
-		ledger.close();
-		return ledger;
+
+
+	public Ledger openReadOnlyLedger(String name) throws NullPointerException{
+		try{
+			Ledger l = new ReadOnlyLedger(this,name);
+			l.open();
+			return l;
+		}catch(LogException e){
+			System.out.format("Ledger with name %s does not exist\n",name);
+			return null;
+		}
 	}
 
-	public Ledger openReadOnlyLedger(String name){
-		return new ReadOnlyLedger(this.poolname,this.seqr_server,this.seqr_port,name);
+	public Ledger createLedger(String name) throws NullPointerException{
+		try{
+			Ledger l = new Ledger(this,name);
+			l.create();
+			return l;
+		}catch(LogException e){
+			System.out.format("Ledger with name %s already exists\n\n",name);
+			return null;
+		}
 	}
 
+	public String getPoolName(){
+		return this.poolname;
+	}
+
+	public String getSeqrServer(){
+		return this.seqr_server;
+	}
+
+	public int getSeqrPort(){
+		return this.seqr_port;
+	}
+
+
+	/*
 	public void deleteLedger(){
 
 	}
-
-	public Boolean isClosed(String name){
-		return new ReadOnlyLedger
-	}*/
+	*/
 	
 }

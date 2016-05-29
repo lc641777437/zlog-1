@@ -4,35 +4,47 @@ import java.util.ArrayList;
 
 public class Ledger{
 	protected String ledgerId;
+	protected Bookkeeper bk;
 	protected Log log;
 	protected Boolean closed;
 	protected long lastAddConfirmed;
-	//initializes a Ledger object
 	
-	Ledger(String poolname,String seqr_server,int seqr_port,String name) throws LogException{
+	//initializes a Ledger object
+	Ledger(Bookkeeper bk,String name) throws LogException{
 		this.ledgerId = name;
-		this.log = Log.open(poolname,seqr_server,seqr_port,name);
-		//this.closed = false;
+		this.bk = bk;
 	}
 	
+	//initializes the log object with an already exisiting ledger
+	public void open() throws LogException{	
+		this.log = Log.openIfExists(bk.getPoolName(),bk.getSeqrServer(),bk.getSeqrPort(),this.ledgerId);
+	 }
 
+	//creates a new ledger
+	public void create() throws LogException{	
+		this.log = Log.create(bk.getPoolName(),bk.getSeqrServer(),bk.getSeqrPort(),this.ledgerId);
+		this.closed = false;
+	}
+
+
+	//returns name of the ledger
 	public String getLedgerId(){
 		return this.ledgerId;
 	}
 
-	//add an entry to the log
+	//add an entry to the ledger
 	public long addEntry(final byte[] data) throws LogException{
-		//if(this.isClosed()){
-			//throw some exception
-		//} 
-		updateLastAddConfirmed(log.append(data));
-		return getLastAddConfirmed();
+		if(this.isClosed()){
+			throw new LogException("Can not write to a closed ledger.\n"); 
+		}
+		this.closed=false;
+		return log.append(data);
 	}
 
 	//returns a single entry
 	public byte[] readEntry(long position) throws LogException{
 		return log.read(position);
-	} 
+	}
 
 	//returns a list of entries
 	public ArrayList<byte[]> readEntries(long start,long end)throws LogException{
@@ -50,28 +62,18 @@ public class Ledger{
 		return this.log.tail();
 	}
 
-	public long getLastAddConfirmed(){
-		return lastAddConfirmed;
-	}
-
-	protected void updateLastAddConfirmed(long entryID){
-		lastAddConfirmed = entryID;
-	}
-
-	/*public Boolean isClosed(){
+	public Boolean isClosed(){
 		return closed;
-	}*/
+	}
 
-	/*public void close(){
+	public void close() throws LogException{
+		//later on we need to make some changes to zlog object, to close or and make it readonly. This method won't give the correct value when another client invokes it parallely. 
 		if(this.closed){
-			//some exception about log already closed.
-			return;
+			throw new LogException("Ledger already closed.");
 		}
 		this.closed=true;
 		return;
-	}*/
-
-	
+	}
 	
 }
 
