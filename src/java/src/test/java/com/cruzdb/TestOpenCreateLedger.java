@@ -2,93 +2,64 @@ package com.cruzdb;
 
 import java.util.ArrayList;
 import java.util.Random;
-
+import java.util.Enumeration;
 import static org.junit.Assert.*;
 import org.junit.*;
 
 public class TestOpenCreateLedger{
 	
 	@Test(expected=LogException.class)
-	public void openLedgerThrows() throws LogException,BkException{
+	public void openLedgerThrows() throws LogException,BKException{
 	
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
+		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 		
 		System.out.println("Opening ledger\n");
 		Random r = new Random();
 		String n = "" + r.nextInt();
-		Ledger l = bk.openLedger(String.valueOf(n));	
-		assertEquals(n,l.getLedgerId());
+		LedgerHandle l = bk.openLedger(String.valueOf(n));	
+		assertEquals(n,l.getId());
 	}
 
 	@Test
-	public void createLedger() throws LogException,BkException{
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
+	public void createLedger() throws LogException,BKException{
+		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 		
 		Random r = new Random();
 		String n = "" + r.nextInt();
-		Ledger l = bk.createLedger(String.valueOf(n));	
-		assertEquals(n,l.getLedgerId());
+		LedgerHandle l = bk.createLedger(String.valueOf(n));	
+		assertEquals(n,l.getId());
 		
 	}
 
 	@Test(expected=LogException.class)
-	public void createLedgerThrows() throws LogException,BkException{
+	public void createLedgerThrows() throws LogException,BKException{
 		
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
+		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 		
 		Random r = new Random();
 		String n = "" + r.nextInt();
-		Ledger l = bk.createLedger(String.valueOf(n));	
+		LedgerHandle l = bk.createLedger(String.valueOf(n));	
 		
-		Ledger l1 = bk.createLedger(String.valueOf(l.getLedgerId()));
-		assertEquals(n,l1.getLedgerId());
+		LedgerHandle l1 = bk.createLedger(String.valueOf(l.getId()));
+		assertEquals(n,l1.getId());
 	}
 
 	@Test
-	public void openLedger() throws LogException,BkException{
+	public void openLedger() throws LogException,BKException{
 	
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
+		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 		
 		Random r = new Random();
 		String n = "" + r.nextInt();
 		
 		System.out.println("Creating a ledger\n");
-		Ledger l = bk.createLedger(String.valueOf(n));	
+		LedgerHandle l = bk.createLedger(String.valueOf(n));	
 		long pos = l.addEntry("abc".getBytes());
 		
-		Ledger l1 = bk.openLedger(String.valueOf(l.getLedgerId()));	
-		assertEquals(n,l1.getLedgerId());
+		LedgerHandle l1 = bk.openLedger(String.valueOf(l.getId()));	
+		assertEquals(n,l1.getId());
+		Enumeration<byte[]> e = l1.readEntries(pos,pos);
+		assertEquals("abc",new String(e.nextElement()));
 	}
-	
-
-	
-	@Test(expected=LogException.class)
-	public void openReadOnlyLedgerThrows() throws LogException,BkException{
-	
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
-		
-		System.out.println("Opening ledger\n");
-		Random r = new Random();
-		String n = "" + r.nextInt();
-		Ledger l = bk.openReadOnlyLedger(String.valueOf(n));	
-		assertEquals(n,l.getLedgerId());
-	}
-
-	@Test
-	public void openReadOnlyLedger() throws LogException,BkException{
-	
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
-		
-		Random r = new Random();
-		String n = "" + r.nextInt();
-		
-		System.out.println("Creating a ledger\n");
-		Ledger l = bk.createLedger(String.valueOf(n));	
-		long pos = l.addEntry("abc".getBytes());
-		
-		Ledger l1 = bk.openReadOnlyLedger(String.valueOf(l.getLedgerId()));	
-		assertEquals("abc",new String(l1.readEntry(pos)));
-	}
-
 }
 

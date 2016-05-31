@@ -6,8 +6,8 @@ package com.cruzdb;
  * This exception is used to describe an internal error from the C++ zlog
  * library.
  */
-public class BkException extends Exception {
-  public BkException(final String msg) {
+public class BKException extends Exception {
+  public BKException(final String msg) {
     super(msg);
   }
 }

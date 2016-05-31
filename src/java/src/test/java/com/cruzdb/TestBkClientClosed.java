@@ -2,129 +2,103 @@ package com.cruzdb;
 
 import java.util.ArrayList;
 import java.util.Random;
-
+import java.util.Enumeration;
 import static org.junit.Assert.*;
 import org.junit.*;
 
 public class TestBkClientClosed{
 	
-	@Test(expected=BkException.class)
-	public void openLedgerThrows() throws LogException,BkException{
+	@Test(expected=BKException.class)
+	public void openLedgerThrows() throws LogException,BKException{
 	
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
+		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 		Random r = new Random();
 		String n = "" + r.nextInt();
-		Ledger l = bk.createLedger(String.valueOf(n));
+		LedgerHandle l = bk.createLedger(String.valueOf(n));
 		bk.close();
-		Ledger l1 = bk.openLedger(String.valueOf(n));
-		assertEquals(n,l1.getLedgerId());
+		LedgerHandle l1 = bk.openLedger(String.valueOf(n));
+		assertEquals(n,l1.getId());
 	}
 
 	
-	@Test(expected=BkException.class)
-	public void openReadOnlyLedgerThrows() throws LogException,BkException{
-	
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
-		Random r = new Random();
-		String n = "" + r.nextInt();
-		Ledger l = bk.createLedger(String.valueOf(n));
-		bk.close();
-		Ledger l1 = bk.openReadOnlyLedger(String.valueOf(n));
-		assertEquals(n,l1.getLedgerId());
-	}
-
-	@Test(expected=BkException.class)
-	public void createLedgerthrows() throws LogException,BkException{
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
+	@Test(expected=BKException.class)
+	public void createLedgerthrows() throws LogException,BKException{
+		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 		bk.close();
 		Random r = new Random();
 		String n = "" + r.nextInt();
-		Ledger l = bk.createLedger(String.valueOf(n));	
-		assertEquals(n,l.getLedgerId());
+		LedgerHandle l = bk.createLedger(String.valueOf(n));	
+		assertEquals(n,l.getId());
 		
 	}
 
-	@Test(expected=BkException.class)
-	public void addEntryThrows() throws LogException,BkException{
+	@Test(expected=BKException.class)
+	public void addEntryThrows() throws LogException,BKException{
 		
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
+		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 		
 		Random r = new Random();
 		String n = "" + r.nextInt();
-		Ledger l = bk.createLedger(String.valueOf(n));	
+		LedgerHandle l = bk.createLedger(String.valueOf(n));	
 		bk.close();
 		long pos = l.addEntry("abc".getBytes());	
-		assertEquals("abc",new String(l.readEntry(pos)));	
 	}
 
 	
-	@Test(expected=BkException.class)
-	public void addEntryReadOnlyThrows() throws LogException,BkException{
+	@Test(expected=BKException.class)
+	public void readEntryThrows() throws LogException,BKException{
 		
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
-		
-		Random r = new Random();
-		String n = "" + r.nextInt();
-		Ledger l = bk.createLedger(String.valueOf(n));
-		Ledger l1 = bk.openReadOnlyLedger(String.valueOf(n));
-		bk.close();
-		long pos = l1.addEntry("abc".getBytes());	
-		assertEquals("abc",new String(l1.readEntry(pos)));	
-	}
-
-	@Test(expected=BkException.class)
-	public void readEntryThrows() throws LogException,BkException{
-		
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
+		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 		
 		Random r = new Random();
 		String n = "" + r.nextInt();
-		Ledger l = bk.createLedger(String.valueOf(n));	
+		LedgerHandle l = bk.createLedger(String.valueOf(n));	
 		long pos = l.addEntry("abc".getBytes());	
 		bk.close();
-		String entry = new String(l.readEntry(pos));
+		Enumeration<byte[]> e = l.readEntries(pos,pos);
+		String entry = new String(e.nextElement());
 		assertEquals("abc",entry);	
 	}
 
-	@Test(expected=BkException.class)
-	public void getLedgerIdThrows() throws LogException,BkException{
+	@Test(expected=BKException.class)
+	public void getIdThrows() throws LogException,BKException{
 	
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
+		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 		
 		Random r = new Random();
 		String n = "" + r.nextInt();
 		
-		Ledger l = bk.createLedger(String.valueOf(n));	
+		LedgerHandle l = bk.createLedger(String.valueOf(n));	
 		bk.close();
-		String lid = l.getLedgerId();	
+		String lid = l.getId();	
 		assertEquals(n,lid);
 	}
 	
 
 	
-	@Test(expected=BkException.class)
-	public void readLastAddConfirmedThrows() throws LogException,BkException{
+	@Test(expected=BKException.class)
+	public void readLastAddConfirmedThrows() throws LogException,BKException{
 	
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
+		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 		
 		Random r = new Random();
 		String n = "" + r.nextInt();
-		Ledger l = bk.createLedger(String.valueOf(n));	
+		LedgerHandle l = bk.createLedger(String.valueOf(n));	
 		long pos = l.addEntry("abc".getBytes());	
 		bk.close();
 		long lac = l.readLastAddConfirmed();	
 		assertEquals(pos,lac);
 	}
 
-	@Test(expected=BkException.class)
-	public void isClosedThrows() throws LogException,BkException{
+	@Test(expected=BKException.class)
+	public void isClosedThrows() throws LogException,BKException{
 	
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
+		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 		
 		Random r = new Random();
 		String n = "" + r.nextInt();
 		
-		Ledger l = bk.createLedger(String.valueOf(n));	
+		LedgerHandle l = bk.createLedger(String.valueOf(n));	
 		long pos = l.addEntry("abc".getBytes());
 		l.close();
 		bk.close();
@@ -133,15 +107,15 @@ public class TestBkClientClosed{
 	}
 
 	
-	@Test(expected=BkException.class)
-	public void CloseThrows() throws LogException,BkException{
+	@Test(expected=BKException.class)
+	public void CloseThrows() throws LogException,BKException{
 	
-		Bookkeeper bk = new Bookkeeper("rbd","127.0.0.1",5678);
+		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 		
 		Random r = new Random();
 		String n = "" + r.nextInt();
 		
-		Ledger l = bk.createLedger(String.valueOf(n));	
+		LedgerHandle l = bk.createLedger(String.valueOf(n));	
 		long pos = l.addEntry("abc".getBytes());
 		bk.close();
 		l.close();
