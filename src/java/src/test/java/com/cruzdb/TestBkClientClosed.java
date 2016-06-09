@@ -55,8 +55,8 @@ public class TestBkClientClosed{
 		LedgerHandle l = bk.createLedger(String.valueOf(n));	
 		long pos = l.addEntry("abc".getBytes());	
 		bk.close();
-		Enumeration<byte[]> e = l.readEntries(pos,pos);
-		String entry = new String(e.nextElement());
+		Enumeration<LedgerEntry> e = l.readEntries(pos,pos);
+		String entry = new String(e.nextElement().getEntry());
 		assertEquals("abc",entry);	
 	}
 

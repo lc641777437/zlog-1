@@ -4,11 +4,11 @@ import java.util.ArrayList;
 import java.util.*;
 
 public class LedgerHandle{
-	protected String ledgerId;
-	protected BookKeeper bk;
-	protected Log log;
-	protected Boolean closed;
-	protected long lastAddConfirmed;
+	String ledgerId;
+	BookKeeper bk;
+	Log log;
+	Boolean closed;
+	long lastAddConfirmed;
 
 	LedgerHandle(){
 	}
@@ -51,16 +51,10 @@ public class LedgerHandle{
 	}
 
 	//returns a list of entries
-	public Enumeration<byte[]> readEntries(long start,long end)throws LogException,BKException{
+	public Enumeration<LedgerEntry> readEntries(long start,long end)throws LogException,BKException{
 		if(bk.isBKClosed())
 			throw new BKException("Bookkeeper client is closed\n");
-		long position;
-		ArrayList<byte[]> entries = new ArrayList<byte[]>();
-		
-		for(position=start;position<=end;position++){
-			entries.add(readEntry(position));
-		}
-		Enumeration e = Collections.enumeration(entries);
+		Enumeration<LedgerEntry> e = new EntriesEnumeration(start,end,this);
 		return e;
 	}
 

@@ -3,12 +3,9 @@ package com.cruzdb;
 import java.util.Random;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import static org.junit.Assert.*;
-import org.junit.*;
 
-public class TestLedgerWriteRead{
+public class Test{
 
-	@Test
 	public void readWrite() throws LogException,BKException{
 		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 	        Random r = new Random();
@@ -17,12 +14,10 @@ public class TestLedgerWriteRead{
 		long entryId = l.addEntry("Dummy Text".getBytes());
 		
 		Enumeration<LedgerEntry> e = l.readEntries(entryId,entryId);
-		assertEquals("Dummy Text",new String(e.nextElement().getEntry()));
 	}
 
 	
-	@Test
-	public void readWriteMultiple() throws LogException,BKException{
+	public static void readWriteMultiple() throws LogException,BKException{
 		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 	        Random r = new Random();
                 String n = "" + r.nextInt();
@@ -44,13 +39,11 @@ public class TestLedgerWriteRead{
 		Enumeration<LedgerEntry> readEntries = l.readEntries(firstId,lastId);
 
 		for(int i=0;i<5;i++){	
-			assertEquals(input.get(i),new String(readEntries.nextElement().getEntry()));
 		}
 	}
 
 
 	
-	@Test
 	public void readLastAddConfirmed() throws LogException,BKException{
 		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 	        Random r = new Random();
@@ -61,11 +54,9 @@ public class TestLedgerWriteRead{
 		for(int i=0;i<5;i++){
 			entryId = l.addEntry(("Dummy Text" + String.valueOf(i)).getBytes());
 		}	
-		assertEquals(entryId,l.readLastAddConfirmed());
 	}
 
 
-	@Test(expected=LogException.class)
 	public void writeReadOnlyThrows() throws LogException,BKException{
 		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
 	        Random r = new Random();
@@ -78,7 +69,6 @@ public class TestLedgerWriteRead{
 	}
 
 
-	@Test
 	public void readReadOnlyLedger() throws LogException,BKException{
 		
 		BookKeeper bk = new BookKeeper("rbd","127.0.0.1",5678);
@@ -91,6 +81,10 @@ public class TestLedgerWriteRead{
 
 		LedgerHandle l1 = bk.openLedger(n);
 		Enumeration<LedgerEntry> e = l1.readEntries(entryId,entryId);
-		assertEquals("Dummy Text",new String(e.nextElement().getEntry()));
+	}
+
+	public static void main(String args[]) throws LogException,BKException{
+		readWriteMultiple();
+		return;
 	}
 }

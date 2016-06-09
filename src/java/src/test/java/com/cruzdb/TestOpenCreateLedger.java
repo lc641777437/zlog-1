@@ -58,8 +58,8 @@ public class TestOpenCreateLedger{
 		
 		LedgerHandle l1 = bk.openLedger(String.valueOf(l.getId()));	
 		assertEquals(n,l1.getId());
-		Enumeration<byte[]> e = l1.readEntries(pos,pos);
-		assertEquals("abc",new String(e.nextElement()));
+		Enumeration<LedgerEntry> e = l1.readEntries(pos,pos);
+		assertEquals("abc",new String(e.nextElement().getEntry()));
 	}
 }
 
