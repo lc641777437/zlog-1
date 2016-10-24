@@ -11,8 +11,13 @@
 #include <rados/librados.hpp>
 #include "proto/zlog.pb.h"
 #include "libzlog/log_impl.h"
+#include "include/zlog/backend/ceph.h"
 
 namespace po = boost::program_options;
+
+static bool stream_support;
+
+static std::string iops_logfile;
 
 static int report_sec;
 
@@ -284,8 +289,10 @@ class LogManager {
       return ret;
     }
 
+    CephBackend *be = new CephBackend(&ioctx);
+
     zlog::Log *baselog;
-    ret = zlog::Log::Open(ioctx, name, NULL, &baselog);
+    ret = zlog::Log::Open(be, name, NULL, &baselog);
     if (ret) {
       std::cerr << "failed to open log " << name << std::endl;
       return ret;
@@ -307,7 +314,7 @@ class LogManager {
      * more dynamic and efficient during a later rewrite of the streaming
      * interface.
      */
-    if (position > 0) {
+    if (stream_support && position > 0) {
       assert(position > 0);
       uint64_t tail = position;
       std::map<uint64_t, std::deque<uint64_t>> ptrs_out;
@@ -378,6 +385,13 @@ class LogManager {
    * are registered during the sleep period.
    */
   void BenchMonitor() {
+    // open the output stream
+    int fd = -1;
+    if (!iops_logfile.empty()) {
+      fd = open(iops_logfile.c_str(), O_WRONLY|O_CREAT|O_TRUNC, 0440);
+      assert(fd != -1);
+    }
+
     for (;;) {
       uint64_t start_ns;
       uint64_t start_seq;
@@ -403,13 +417,12 @@ class LogManager {
 
       uint64_t end_ns;
       uint64_t end_seq;
-      int num_logs;
+      uint64_t num_logs;
 
       // ending state of all the current sequences
       {
         std::unique_lock<std::mutex> g(lock_);
 
-        end_ns = get_time();
         end_seq = 0;
         num_logs = logs_.size();
 
@@ -417,15 +430,32 @@ class LogManager {
         for (it = logs_.begin(); it != logs_.end(); it++) {
           end_seq += it->second.seq->read();
         }
+
+        end_ns = get_time();
       }
 
       uint64_t elapsed_ns = end_ns - start_ns;
       uint64_t total_seqs = end_seq - start_seq;
       uint64_t rate = (total_seqs * 1000000000ULL) / elapsed_ns;
-      if (num_logs_start == num_logs)
-        std::cout << "seqr rate = " << rate << " seqs/sec" << std::endl;
-      else
+
+      double iops = (double)(total_seqs * 1000000000ULL) / (double)elapsed_ns;
+      time_t now = time(NULL);
+
+      if (num_logs_start == num_logs) {
+        std::cout << "seqr rate = " << rate << " (" << iops << ") seqs/sec" << std::endl;
+        if (fd != -1) {
+          dprintf(fd, "%llu %llu\n",
+              (unsigned long long)now,
+              (unsigned long long)iops);
+          fsync(fd);
+        }
+      } else
         std::cout << "seqr rate = " << rate << " seqs/sec (warn: log count change)" << std::endl;
+    }
+
+    if (fd != -1) {
+      fsync(fd);
+      close(fd);
     }
   }
 
@@ -602,6 +632,16 @@ class Session {
            * request for incrementing the log tail.
            */
 
+          /*
+           * this is very rude... well, the current support for streams
+           * contains some cases that cause major delays while processing log
+           * entries and stream support is pre-alpha stage, so we've added a
+           * mode that assumes no clients with use the stream api.
+           *
+           * consider yourself warned.
+           */
+          assert(stream_support);
+
           // batch stream requests not yet supported
           assert(req_.count() == 1);
 
@@ -751,6 +791,8 @@ int main(int argc, char* argv[])
     ("nthreads", po::value<int>(&nthreads)->default_value(1), "Num threads")
     ("report-sec", po::value<int>(&report_sec)->default_value(0), "Time between rate reports")
     ("daemon,d", "Run in background")
+    ("streams", po::bool_switch(&stream_support)->default_value(false), "support streams")
+    ("iops-logfile", po::value<std::string>(&iops_logfile)->default_value(""), "iops log file")
   ;
 
   po::variables_map vm;

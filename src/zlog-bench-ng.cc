@@ -13,6 +13,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <rados/librados.hpp>
 #include "libzlog/log_impl.h"
+#include "include/zlog/backend/ceph.h"
 
 namespace po = boost::program_options;
 
@@ -22,7 +23,7 @@ namespace po = boost::program_options;
 struct AioState {
   zlog::LogImpl *log;
   ceph::bufferlist append_bl;
-  ceph::bufferlist read_bl;
+  std::string read_str;
   zlog::AioCompletion *c;
   librados::AioCompletion *rc; // used by append workload
   uint64_t position;
@@ -112,7 +113,6 @@ static void verify_append_cb(AioState *s)
 static void handle_append_cb(AioState *s)
 {
   auto completed = std::chrono::steady_clock::now();
-  zlog::LogImpl *log = s->log;
 
   ios_completed++;
   ios_completed_total++;
@@ -128,6 +128,7 @@ static void handle_append_cb(AioState *s)
   latency_us += diff_us.count();
 
 #ifdef VERIFY_IOS
+  zlog::LogImpl *log = s->log;
   if (s->append_bl.length() > 0)
     assert(!(s->append_bl == s->read_bl));
   s->c = zlog::Log::aio_create_completion(std::bind(verify_append_cb, s));
@@ -177,7 +178,7 @@ static void handle_read_cb(AioState *s)
     std::cout << op_rv << " " << s->position << std::endl;
   }
   assert(s->c->ReturnValue() == 0);
-  assert(s->read_bl.length() > 0);
+  assert(s->read_str.size() > 0);
 
   delete s->c;
   s->c = NULL;
@@ -199,7 +200,8 @@ class FakeSeqrClient : public zlog::SeqrClient {
 
   void Init(librados::IoCtx& ioctx) {
     zlog::Log *baselog;
-    int ret = zlog::LogImpl::Open(ioctx, name_, NULL, &baselog);
+    CephBackend *be = new CephBackend(&ioctx);
+    int ret = zlog::LogImpl::Open(be, name_, NULL, &baselog);
     assert(ret == 0);
     zlog::LogImpl *log = reinterpret_cast<zlog::LogImpl*>(baselog);
 
@@ -385,7 +387,7 @@ int main(int argc, char **argv)
   std::vector<std::string> append_oids;
   if (append) {
       assert(width > 0);
-      for (size_t i = 0; i < width; i++) {
+      for (int i = 0; i < width; i++) {
           std::stringstream oid;
           oid << logname << "." << i;
           append_oids.push_back(oid.str());
@@ -401,7 +403,8 @@ int main(int argc, char **argv)
     client = new FakeSeqrClient(logname);
   }
   zlog::Log *baselog;
-  ret = zlog::LogImpl::OpenOrCreate(ioctx, logname, client, &baselog);
+  CephBackend *be = new CephBackend(&ioctx);
+  ret = zlog::LogImpl::OpenOrCreate(be, logname, client, &baselog);
   assert(ret == 0);
   zlog::LogImpl *log = reinterpret_cast<zlog::LogImpl*>(baselog);
 
@@ -413,8 +416,7 @@ int main(int argc, char **argv)
   // this is just a little hack that forces the epoch to be refreshed in the
   // log instance. otherwise when we blast out a bunch of async requests they
   // all end up having old epochs.
-  ceph::bufferlist bl;
-  log->Append(bl);
+  log->Append(Slice());
 
   /*
    * For read mode we look up the current tail and then issue random reads
@@ -490,21 +492,19 @@ int main(int argc, char **argv)
       uint64_t start_ns, latency_ns;
       if (read_mode) {
         uint64_t pos = dis(gen);
-        ceph::bufferlist bl;
+        std::string entry;
         start_ns = getns();
-        int ret = log->Read(pos, bl);
+        int ret = log->Read(pos, &entry);
         latency_ns = getns() - start_ns;
         assert(ret == 0);
-        assert(bl.length() > 0);
+        assert(entry.size() > 0);
       } else {
-        for (unsigned i = 0; i < iosize; i++) {
+        for (unsigned i = 0; i < (unsigned)iosize; i++) {
           iobuf[i] = (char)rand();
         }
         uint64_t pos = 0;
-        ceph::bufferlist bl;
-        bl.append(iobuf, iosize);
         start_ns = getns();
-        int ret = log->Append(bl, &pos);
+        int ret = log->Append(Slice(iobuf, iosize), &pos);
         latency_ns = getns() - start_ns;
         assert(ret == 0);
         assert(pos > 0);
@@ -520,7 +520,7 @@ int main(int argc, char **argv)
     size_t append_oid_cnt = append_oids.size();
     size_t append_count = 0; // used to stripe ios in append mode
     for (;;) {
-      while (outstanding_ios < qdepth) {
+      while (outstanding_ios < (unsigned)qdepth) {
         AioState *state = new AioState;
         state->log = log;
         if (read_mode) {
@@ -528,7 +528,7 @@ int main(int argc, char **argv)
           state->c = zlog::Log::aio_create_completion(std::bind(handle_read_cb, state));
           assert(state->c);
           state->submitted = std::chrono::steady_clock::now();
-          ret = log->AioRead(state->position, state->c, &state->read_bl);
+          ret = log->AioRead(state->position, state->c, &state->read_str);
           assert(ret == 0);
         } else if (append) {
           // this is a simulation where we grab a sequence number and do an
@@ -541,7 +541,7 @@ int main(int argc, char **argv)
           //
           state->rc = librados::Rados::aio_create_completion(state, NULL, handle_bulk_append_cb);
           assert(state->rc);
-          for (unsigned i = 0; i < iosize; i++) {
+          for (unsigned i = 0; i < (unsigned)iosize; i++) {
             iobuf[i] = (char)rand();
           }
           state->append_bl.append(iobuf, iosize);
@@ -556,18 +556,18 @@ int main(int argc, char **argv)
         } else {
           state->c = zlog::Log::aio_create_completion(std::bind(handle_append_cb, state));
           assert(state->c);
-          for (unsigned i = 0; i < iosize; i++) {
+          for (unsigned i = 0; i < (unsigned)iosize; i++) {
             iobuf[i] = (char)rand();
           }
           state->append_bl.append(iobuf, iosize);
           state->submitted = std::chrono::steady_clock::now();
-          ret = log->AioAppend(state->c, state->append_bl, &state->position);
+          ret = log->AioAppend(state->c, Slice(state->append_bl.c_str(), state->append_bl.length()), &state->position);
           assert(ret == 0);
         }
 
         outstanding_ios++;
       }
-      io_cond.wait(lock, [&]{ return outstanding_ios < qdepth; });
+      io_cond.wait(lock, [&]{ return outstanding_ios < (unsigned)qdepth; });
 
       if (stop)
         break;
