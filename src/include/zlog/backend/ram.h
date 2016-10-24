@@ -27,6 +27,17 @@ class RAMBackend : public Backend {
     return ZLOG_OK;
   }
 
+  virtual int Delete(const std::string& oid) {
+    std::lock_guard<std::mutex> l(lock_);
+    auto it = db_.find(oid);
+    if (it == db_.end())
+      return -ENOENT;
+    else {
+      db_.erase(it);
+    }
+    return ZLOG_OK;
+  }
+
   virtual int CreateHeadObject(const std::string& oid,
       const zlog_proto::MetaLog& data) {
     std::lock_guard<std::mutex> l(lock_);

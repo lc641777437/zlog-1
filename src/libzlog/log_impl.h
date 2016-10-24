@@ -76,7 +76,12 @@ class LogImpl : public Log {
    *
    */
   int Read(uint64_t position, std::string *data);
-
+  
+  /*
+   * Delete a log.
+   */
+  int Delete();
+  
   /*
    *
    */

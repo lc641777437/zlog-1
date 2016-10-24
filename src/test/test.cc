@@ -93,6 +93,28 @@ TEST_F(LibZlog, Create) {
   ASSERT_EQ(log, nullptr);
 }
 
+TEST_F(LibZlog, Delete) {
+  zlog::Log *log = NULL;
+  int ret = zlog::Log::Create(be, "mylog", client, &log);
+  ASSERT_EQ(ret, 0);
+  ASSERT_NE(log, nullptr);
+
+  ret = log->Delete();
+  ASSERT_EQ(ret, 0);
+
+  ret = log->Delete();
+  ASSERT_EQ(ret, -ENOENT);
+  
+  ret = zlog::Log::Open(be, "mylog", client, &log);
+  ASSERT_EQ(ret, -ENOENT);
+
+  ret = zlog::Log::Create(be, "mylog", client, &log);
+  ASSERT_EQ(ret, 0);
+  ASSERT_NE(log, nullptr);
+
+  delete log;
+}
+
 TEST_F(LibZlog, Open) {
   zlog::Log *log = NULL;
 

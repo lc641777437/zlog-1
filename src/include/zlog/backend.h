@@ -32,6 +32,11 @@ class Backend {
   /*
    *
    */
+  virtual int Delete(const std::string& oid) = 0;
+
+  /*
+   *
+   */
   virtual int CreateHeadObject(const std::string& oid,
       const zlog_proto::MetaLog& data) = 0;
 

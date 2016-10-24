@@ -720,4 +720,23 @@ int LogImpl::Read(uint64_t position, std::string *data)
   assert(0);
 }
 
+int LogImpl::Delete()
+{
+    for (;;) {
+      int ret = new_backend->Delete(metalog_oid_);
+      if (ret < 0) {
+        std::cerr << "delete failed ret " << ret << std::endl;
+        return ret;
+      }
+
+      if (ret == Backend::ZLOG_OK)
+        return 0;
+      else {
+        std::cerr << "unknown reply";
+        assert(0);
+      }
+    }
+    assert(0);
+}
+
 }
