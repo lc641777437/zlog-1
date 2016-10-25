@@ -532,7 +532,6 @@ int LogImpl::Append(const Slice& data, uint64_t *pposition)
     uint64_t epoch;
     std::string oid;
     mapper_.FindObject(position, &oid, &epoch);
-
     ret = new_backend->Write(oid, data, epoch, position);
     if (ret < 0 && ret != -EFBIG) {
       std::cerr << "append: failed ret " << ret << std::endl;
@@ -723,17 +722,38 @@ int LogImpl::Read(uint64_t position, std::string *data)
 int LogImpl::Delete()
 {
     for (;;) {
+
+      //deleting the metalog object
       int ret = new_backend->Delete(metalog_oid_);
       if (ret < 0) {
         std::cerr << "delete failed ret " << ret << std::endl;
         return ret;
       }
 
-      if (ret == Backend::ZLOG_OK)
-        return 0;
-      else {
-        std::cerr << "unknown reply";
-        assert(0);
+      //find the tail of the log and delete the log entries accross stripe(s)
+      uint64_t tail;
+      ret = CheckTail(&tail, false);
+      if (ret)
+        return ret;
+        
+      uint64_t epoch;
+      std::string oid;
+
+      //delete log entries accross stripe(s)
+      for(uint64_t i = 0;i < tail;i++) {
+        mapper_.FindObject(i, &oid, &epoch);
+        int ret = new_backend->Delete(oid);
+
+        if (ret == Backend::ZLOG_OK)
+          continue;
+        else if (ret < 0) {
+          std::cerr << "delete failed ret " << ret << std::endl;
+          return ret;
+        }
+        else {
+          std::cerr << "unknown reply";
+          assert(0);
+        }
       }
     }
     assert(0);

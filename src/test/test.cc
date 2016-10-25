@@ -99,6 +99,16 @@ TEST_F(LibZlog, Delete) {
   ASSERT_EQ(ret, 0);
   ASSERT_NE(log, nullptr);
 
+  uint64_t tail;
+  for (int i = 0; i < 100; i++) {
+    uint64_t pos;
+    ret = log->Append(Slice(), &pos);
+    ASSERT_EQ(ret, 0);
+
+    ret = log->CheckTail(&tail);
+    ASSERT_EQ(ret, 0);
+  }
+  
   ret = log->Delete();
   ASSERT_EQ(ret, 0);
 
