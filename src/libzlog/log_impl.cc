@@ -723,38 +723,53 @@ int LogImpl::Delete()
 {
     for (;;) {
 
+      /*
+       * Get the current projection. We'll add the new striping width when we
+       * propose the next projection/epoch.
+       */
+      uint64_t epoch;
+      zlog_proto::MetaLog config;
+      int ret = new_backend->LatestProjection(metalog_oid_, &epoch, config);
+      if (ret != Backend::ZLOG_OK) {
+        std::cerr << "failed to get projection ret " << ret << std::endl;
+        return ret;
+      }
+
+      StripeHistory hist;
+      ret = hist.Deserialize(config);
+      if (ret) 
+        return ret;
+      assert(!hist.Empty());
+
+      std::vector<std::string> objects;
+      mapper_.LatestObjectSet(objects, hist);
+
+
       //deleting the metalog object
-      int ret = new_backend->Delete(metalog_oid_);
+      ret = new_backend->Delete(metalog_oid_);
       if (ret < 0) {
         std::cerr << "delete failed ret " << ret << std::endl;
         return ret;
       }
 
-      //find the tail of the log and delete the log entries accross stripe(s)
-      uint64_t tail;
-      ret = CheckTail(&tail, false);
-      if (ret)
-        return ret;
-        
-      uint64_t epoch;
-      std::string oid;
 
       //delete log entries accross stripe(s)
-      for(uint64_t i = 0;i < tail;i++) {
-        mapper_.FindObject(i, &oid, &epoch);
-        int ret = new_backend->Delete(oid);
+      for(uint64_t i = 0;i < objects.size();i++) {
+        //std::cout<<objects.size()<<std::endl;
+        ret = new_backend->Delete(objects[i]);
 
         if (ret == Backend::ZLOG_OK)
           continue;
-        else if (ret < 0) {
-          std::cerr << "delete failed ret " << ret << std::endl;
-          return ret;
+        else if (ret == -ENOENT) {
+          std::cerr << "All entries deleted " << ret << std::endl;
+          return Backend::ZLOG_OK;
         }
         else {
           std::cerr << "unknown reply";
           assert(0);
         }
       }
+      return ret;
     }
     assert(0);
 }

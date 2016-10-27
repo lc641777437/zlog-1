@@ -100,7 +100,7 @@ TEST_F(LibZlog, Delete) {
   ASSERT_NE(log, nullptr);
 
   uint64_t tail;
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < 65; i++) {
     uint64_t pos;
     ret = log->Append(Slice(), &pos);
     ASSERT_EQ(ret, 0);

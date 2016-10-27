@@ -30,8 +30,9 @@ class RAMBackend : public Backend {
   virtual int Delete(const std::string& oid) {
     std::lock_guard<std::mutex> l(lock_);
     auto it = db_.find(oid);
-    if (it == db_.end())
+    if (it == db_.end()){
       return -ENOENT;
+    }
     else {
       db_.erase(it);
     }
