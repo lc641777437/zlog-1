@@ -99,29 +99,40 @@ TEST_F(LibZlog, Delete) {
   ASSERT_EQ(ret, 0);
   ASSERT_NE(log, nullptr);
 
-  uint64_t tail;
-  for (int i = 0; i < 65; i++) {
-    uint64_t pos;
-    ret = log->Append(Slice(), &pos);
+  uint64_t tail,pos;
+  for (uint64_t i = 0; i < 65; i++) {
+    ret = log->Append(Slice("test1"), &pos);
     ASSERT_EQ(ret, 0);
 
     ret = log->CheckTail(&tail);
     ASSERT_EQ(ret, 0);
+    ASSERT_EQ(i, tail-1);
   }
   
   ret = log->Delete();
   ASSERT_EQ(ret, 0);
 
-  ret = log->Delete();
-  ASSERT_EQ(ret, -ENOENT);
-  
+  //as long as user has the pointer to log he can still append to it.
+  log->Append(Slice("test"),&pos);
+  ASSERT_EQ(tail, pos);
+
+  //as long as user has the pointer to log he can still read from it.
+  std::string entry;
+  ret = log->Read(0,&entry);
+  ASSERT_EQ(entry, "test1");
+
+  //trying to open log with the same name fails.
   ret = zlog::Log::Open(be, "mylog", client, &log);
   ASSERT_EQ(ret, -ENOENT);
 
+  //creating a new log with same name should succeed.
   ret = zlog::Log::Create(be, "mylog", client, &log);
   ASSERT_EQ(ret, 0);
   ASSERT_NE(log, nullptr);
-
+    
+  ret = log->Append(Slice("after deletion"),&pos);
+  ret = log->Read(0,&entry);
+  ASSERT_EQ(entry, "after deletion");
   delete log;
 }
 

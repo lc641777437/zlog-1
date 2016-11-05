@@ -81,7 +81,22 @@ class LogImpl : public Log {
    * Delete a log.
    */
   int Delete();
-  
+
+  /*
+   * Backup a log
+   */
+  int Backup();
+
+  /*
+   * Check if a log is deleted already
+   */
+  int CheckDeleted();
+
+  /*
+   * Garbage collect deleted logs
+   */
+  int GarbageCollector();
+
   /*
    *
    */
@@ -131,7 +146,7 @@ class LogImpl : public Log {
   SeqrClient *seqr;
 
   Backend *new_backend;
-
+  int version;
 #if BACKEND_SUPPORT_DISABLE
   TmpBackend *backend;
   int backend_ver;

@@ -46,6 +46,7 @@ int Log::CreateWithStripeWidth(Backend *backend, const std::string& name,
     return -EINVAL;
   }
 
+
   // Setup the first projection
   StripeHistory hist;
   hist.AddStripe(0, 0, stripe_size);
@@ -60,6 +61,14 @@ int Log::CreateWithStripeWidth(Backend *backend, const std::string& name,
     return ret;
   }
 
+  int version = 0;
+  std::string del_name_meta = LogImpl::metalog_oid_from_name(name + "." + std::to_string(version)+".deleted");
+  while(backend->Exists(del_name_meta)==0)
+  {
+    version++;
+    del_name_meta = LogImpl::metalog_oid_from_name(name + "." + std::to_string(version)+".deleted");
+  }
+
   LogImpl *impl = new LogImpl;
 
   impl->new_backend = backend;
@@ -67,6 +76,7 @@ int Log::CreateWithStripeWidth(Backend *backend, const std::string& name,
   impl->metalog_oid_ = metalog_oid;
   impl->seqr = seqr;
   impl->mapper_.SetName(name);
+  impl->version = version;
 
   ret = impl->RefreshProjection();
   if (ret) {
@@ -105,6 +115,14 @@ int Log::Open(Backend *backend, const std::string& name,
     return ret;
   }
 
+  int version = 0;
+  std::string del_name_meta = LogImpl::metalog_oid_from_name(name + "." + std::to_string(version)+".deleted");
+  while(backend->Exists(del_name_meta)==0)
+  {
+    version++;
+    del_name_meta = LogImpl::metalog_oid_from_name(name + "." + std::to_string(version)+".deleted");
+  }
+
   LogImpl *impl = new LogImpl;
 
   impl->new_backend = backend;
@@ -112,6 +130,7 @@ int Log::Open(Backend *backend, const std::string& name,
   impl->metalog_oid_ = metalog_oid;
   impl->seqr = seqr;
   impl->mapper_.SetName(name);
+  impl->version = version;
 
   ret = impl->RefreshProjection();
   if (ret) {
@@ -158,7 +177,7 @@ class new_stripe_notifier {
 int LogImpl::CreateNewStripe(uint64_t last_epoch)
 {
   assert(backend_ver == 2);
-
+  LogImpl::CheckDeleted();
   /*
    * If creation of a new stripe is pending then we will block on the
    * condition variable until the creating thread has completed or there was
@@ -265,6 +284,8 @@ int LogImpl::SetStripeWidth(int width)
    * Get the current projection. We'll add the new striping width when we
    * propose the next projection/epoch.
    */
+  LogImpl::CheckDeleted();
+
   uint64_t epoch;
   zlog_proto::MetaLog config;
   int ret = new_backend->LatestProjection(metalog_oid_, &epoch, config);
@@ -312,6 +333,9 @@ int LogImpl::CreateCut(uint64_t *pepoch, uint64_t *maxpos)
    * Get the current projection. We'll make a copy of this as the next
    * projection.
    */
+
+  LogImpl::CheckDeleted();
+
   uint64_t epoch;
   zlog_proto::MetaLog config;
   int ret = new_backend->LatestProjection(metalog_oid_, &epoch, config);
@@ -403,6 +427,7 @@ int LogImpl::Seal(const std::vector<std::string>& objects,
 int LogImpl::RefreshProjection()
 {
   for (;;) {
+    LogImpl::CheckDeleted();
     uint64_t epoch;
     zlog_proto::MetaLog config;
     int ret = new_backend->LatestProjection(metalog_oid_, &epoch, config);
@@ -524,6 +549,8 @@ int LogImpl::CheckTail(const std::set<uint64_t>& stream_ids,
 int LogImpl::Append(const Slice& data, uint64_t *pposition)
 {
   for (;;) {
+    LogImpl::CheckDeleted();
+    
     uint64_t position;
     int ret = CheckTail(&position, true);
     if (ret)
@@ -577,6 +604,7 @@ int LogImpl::Append(const Slice& data, uint64_t *pposition)
 int LogImpl::Fill(uint64_t epoch, uint64_t position)
 {
   for (;;) {
+    LogImpl::CheckDeleted();
     std::string oid;
     mapper_.FindObject(position, &oid, NULL);
 
@@ -604,6 +632,7 @@ int LogImpl::Fill(uint64_t epoch, uint64_t position)
 int LogImpl::Fill(uint64_t position)
 {
   for (;;) {
+    LogImpl::CheckDeleted();
     uint64_t epoch;
     std::string oid;
     mapper_.FindObject(position, &oid, &epoch);
@@ -632,6 +661,7 @@ int LogImpl::Fill(uint64_t position)
 int LogImpl::Trim(uint64_t position)
 {
   for (;;) {
+    LogImpl::CheckDeleted();
     uint64_t epoch;
     std::string oid;
     mapper_.FindObject(position, &oid, &epoch);
@@ -659,6 +689,7 @@ int LogImpl::Trim(uint64_t position)
 int LogImpl::Read(uint64_t epoch, uint64_t position, std::string *data)
 {
   for (;;) {
+    LogImpl::CheckDeleted();
     std::string oid;
     mapper_.FindObject(position, &oid, NULL);
 
@@ -690,10 +721,11 @@ int LogImpl::Read(uint64_t epoch, uint64_t position, std::string *data)
 int LogImpl::Read(uint64_t position, std::string *data)
 {
   for (;;) {
+    LogImpl::CheckDeleted();
     uint64_t epoch;
     std::string oid;
     mapper_.FindObject(position, &oid, &epoch);
-
+    
     int ret = new_backend->Read(oid, epoch, position, data);
     if (ret < 0) {
       std::cerr << "read failed ret " << ret << std::endl;
@@ -719,14 +751,82 @@ int LogImpl::Read(uint64_t position, std::string *data)
   assert(0);
 }
 
+int LogImpl::CheckDeleted()
+{
+    std::string del_name = name_ + "." +std::to_string(version) + ".deleted";
+    std::string metalog_oid = LogImpl::metalog_oid_from_name(del_name);
+    if(new_backend->Exists(metalog_oid)==0)
+    {
+        name_ = del_name;
+        metalog_oid_ = metalog_oid;
+        mapper_.SetName(name_);
+    }
+    return 0;
+}
+
+
+int LogImpl::Backup(){
+    uint64_t tail, pos; 
+    int ret = CheckTail(&tail, false);
+    std::string data[tail];
+    for(uint64_t i = 0;i < tail;i++)
+    {
+        std::string entry;
+        ret = LogImpl::Read(i,&entry);
+        if(ret == Backend::ZLOG_INVALIDATED)
+        {
+            data[i]="";
+        }
+        else if(ret == Backend::ZLOG_OK)
+        {
+            data[i] = entry;
+        }
+        else
+        {
+            std::cout<<"Backup failed "<<ret<<std::endl;
+            return ret;
+            assert(0);
+        }
+    }
+
+    std::string name = name_ + "." + std::to_string(version) + ".deleted";
+    zlog::Log *log = NULL;
+    ret = zlog::Log::Create(new_backend, name, seqr, &log);
+    
+    for(uint64_t i = 0;i < tail;i++)
+    {
+        if(data[i]=="")
+        {
+            ret = log->Trim(i);
+        }
+        else
+        {
+            ret = log->Append(data[i],&pos);
+        }
+    }
+    return ret;
+}
+
+
 int LogImpl::Delete()
 {
     for (;;) {
+      //creating a backup
+      int ret = LogImpl::Backup();
+      if (ret < 0) {
+        std::cerr << "backup phase of delete failed ret " << ret << std::endl;
+        return ret;
+      }
+      
+      ret = LogImpl::GarbageCollector();
+      return ret;
+    }
+    assert(0);
+}
 
-      /*
-       * Get the current projection. We'll add the new striping width when we
-       * propose the next projection/epoch.
-       */
+int LogImpl::GarbageCollector()
+{
+    for (;;) {
       uint64_t epoch;
       zlog_proto::MetaLog config;
       int ret = new_backend->LatestProjection(metalog_oid_, &epoch, config);
@@ -743,7 +843,9 @@ int LogImpl::Delete()
 
       std::vector<std::string> objects;
       mapper_.LatestObjectSet(objects, hist);
-
+      
+      //delete entry in the sequencer as well
+      ret = seqr->Delete(new_backend->pool(), name_);
 
       //deleting the metalog object
       ret = new_backend->Delete(metalog_oid_);
@@ -752,10 +854,8 @@ int LogImpl::Delete()
         return ret;
       }
 
-
       //delete log entries accross stripe(s)
       for(uint64_t i = 0;i < objects.size();i++) {
-        //std::cout<<objects.size()<<std::endl;
         ret = new_backend->Delete(objects[i]);
 
         if (ret == Backend::ZLOG_OK)
@@ -769,6 +869,7 @@ int LogImpl::Delete()
           assert(0);
         }
       }
+
       return ret;
     }
     assert(0);

@@ -512,6 +512,14 @@ class FakeSeqrClient : public zlog::SeqrClient {
     }
   }
 
+  virtual int Delete(const std::string& pool, const std::string& name){
+    auto it = entries_.find(std::make_pair(pool, name));
+    if (it != entries_.end()) {
+      entries_.erase(std::make_pair(pool, name));
+    }
+    return 0;
+  }
+
  private:
   typedef std::deque<uint64_t> stream_backpointers_t;
   typedef std::map<uint64_t, stream_backpointers_t> stream_index_t;

@@ -38,6 +38,7 @@ class SeqrClient {
       std::map<uint64_t, std::vector<uint64_t>>& stream_backpointers,
       uint64_t *position, bool next);
 
+  virtual int Delete(const std::string& pool, const std::string& name);
  private:
   struct channel {
     channel() : socket_(io_service_) {}

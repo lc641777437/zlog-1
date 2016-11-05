@@ -207,4 +207,8 @@ int SeqrClient::CheckTail(uint64_t epoch, const std::string& pool,
   return 0;
 }
 
+int SeqrClient::Delete(const std::string& pool, const std::string& name){
+  return 0;
+}
+
 }
