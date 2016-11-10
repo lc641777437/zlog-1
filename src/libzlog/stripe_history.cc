@@ -14,6 +14,7 @@ zlog_proto::MetaLog StripeHistory::Serialize() const
     entry->set_pos(position);
     entry->set_epoch(s.epoch);
     entry->set_width(s.width);
+    entry->set_uid(s.uid);
   }
 
   return config;
@@ -25,7 +26,7 @@ int StripeHistory::Deserialize(const zlog_proto::MetaLog& config)
     const zlog_proto::MetaLog_StripeHistoryEntry& e = config.stripe_history(i);
     uint64_t position = e.pos();
     assert(history_.find(position) == history_.end());
-    Stripe stripe = { e.epoch(), (int)e.width() };
+    Stripe stripe = { e.epoch(), (int)e.width(), (uint64_t)e.uid() };
     history_[position] = stripe;
   }
 
@@ -36,12 +37,12 @@ bool StripeHistory::Empty() const {
   return history_.empty();
 }
 
-void StripeHistory::AddStripe(uint64_t position, uint64_t epoch, int width)
+void StripeHistory::AddStripe(uint64_t position, uint64_t epoch, int width, uint64_t uid)
 {
   const auto it = history_.lower_bound(position);
   assert(it == history_.end());
   assert(width > 0);
-  Stripe stripe = { epoch, width };
+  Stripe stripe = { epoch, width, uid };
   history_[position] = stripe;
 }
 

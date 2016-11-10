@@ -100,7 +100,7 @@ TEST_F(LibZlog, Delete) {
   ASSERT_NE(log, nullptr);
 
   uint64_t tail,pos;
-  for (uint64_t i = 0; i < 65; i++) {
+  for (uint64_t i = 0; i < 50; i++) {
     ret = log->Append(Slice("test1"), &pos);
     ASSERT_EQ(ret, 0);
 
@@ -133,6 +133,45 @@ TEST_F(LibZlog, Delete) {
   ret = log->Append(Slice("after deletion"),&pos);
   ret = log->Read(0,&entry);
   ASSERT_EQ(entry, "after deletion");
+  delete log;
+}
+
+TEST_F(LibZlog, GarbageCollector) {
+  zlog::Log *log = NULL;
+  int ret = zlog::Log::Create(be, "mylog", client, &log);
+  ASSERT_EQ(ret, 0);
+  ASSERT_NE(log, nullptr);
+
+  uint64_t pos;
+
+  ret = log->Append(Slice("test"),&pos);
+  ASSERT_EQ(ret, 0);
+  
+  ret = log->GarbageCollect();
+  ASSERT_EQ(ret, 0);
+
+  //read fails
+  std::string entry;
+  ret = log->Read(0,&entry);
+  ASSERT_EQ(ret, -ENODEV);
+
+  //can create a log with same name
+  ret = zlog::Log::Create(be, "mylog", client, &log);
+  ASSERT_EQ(ret, 0);
+  ASSERT_NE(log, nullptr);
+  
+  ret = log->Delete();
+  ASSERT_EQ(ret, 0);
+
+  //garbage collecting a deleted log doesnt give an error
+  ret = log->GarbageCollect();
+  ASSERT_EQ(ret, 0);  
+  
+
+  //trying to open log fails.
+  ret = zlog::Log::Open(be, "mylog", client, &log);
+  ASSERT_EQ(ret, -ENOENT);
+ 
   delete log;
 }
 

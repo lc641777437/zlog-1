@@ -29,6 +29,7 @@ class Log {
   virtual int Fill(uint64_t position) = 0;
   virtual int CheckTail(uint64_t *pposition) = 0;
   virtual int Trim(uint64_t position) = 0;
+  virtual int GarbageCollect() = 0;
 
   /*
    * Asynchronous API

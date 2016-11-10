@@ -7,6 +7,7 @@ message MetaLog {
         required uint64 pos = 1;
         required uint32 width = 2;
         required uint64 epoch = 3;
+        required uint64 uid = 4;
     }
     repeated StripeHistoryEntry stripe_history = 1;
 }

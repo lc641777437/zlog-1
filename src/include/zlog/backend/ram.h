@@ -516,8 +516,11 @@ class FakeSeqrClient : public zlog::SeqrClient {
     auto it = entries_.find(std::make_pair(pool, name));
     if (it != entries_.end()) {
       entries_.erase(std::make_pair(pool, name));
+      return 0;
     }
-    return 0;
+    else {
+      return -ENOENT;
+    }
   }
 
  private:

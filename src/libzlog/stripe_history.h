@@ -8,9 +8,10 @@ class StripeHistory {
   struct Stripe {
     uint64_t epoch;
     int width;
+    uint64_t uid;
   };
 
-  void AddStripe(uint64_t position, uint64_t epoch, int width);
+  void AddStripe(uint64_t position, uint64_t epoch, int width, uint64_t uuid);
   void CloneLatestStripe(uint64_t position, uint64_t epoch);
 
   Stripe FindStripe(uint64_t position) const;

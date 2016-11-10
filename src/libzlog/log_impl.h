@@ -83,19 +83,9 @@ class LogImpl : public Log {
   int Delete();
 
   /*
-   * Backup a log
-   */
-  int Backup();
-
-  /*
-   * Check if a log is deleted already
-   */
-  int CheckDeleted();
-
-  /*
    * Garbage collect deleted logs
    */
-  int GarbageCollector();
+  int GarbageCollect();
 
   /*
    *
@@ -115,6 +105,8 @@ class LogImpl : public Log {
 
   static std::string metalog_oid_from_name(const std::string& name);
 
+  static std::string backup_node_from_uid_name(const std::string& name,const uint64_t &uid);
+  
   LogImpl(const LogImpl& rhs);
   LogImpl& operator=(const LogImpl& rhs);
 
@@ -144,9 +136,9 @@ class LogImpl : public Log {
   std::string name_;
   std::string metalog_oid_;
   SeqrClient *seqr;
+  std::string backup_node_uid_;
 
   Backend *new_backend;
-  int version;
 #if BACKEND_SUPPORT_DISABLE
   TmpBackend *backend;
   int backend_ver;
